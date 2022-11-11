@@ -1,0 +1,250 @@
+---
+title: "tp_final_instrumentos"
+author: "icalb"
+date: '2022-10-28'
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+```
+```{r}
+lista_BP <- read.csv("data/2022-07-13_info_publica.csv", stringsAsFactors = TRUE)
+```
+
+¿Cómo se distribuyó espacialmente en los últimos años la inversión en proyectos o programas de integración socio urbana de barrios populares en Argentina? 
+
+La cuestión del financiamiento de integración de barrios marginados es uno de los principales temas de debate de la agenda urbana actual. Existen más de 1 billón de personas en el mundo que viven en asentamientos informales, y que no logran un satisfacer sus necesidades básicas ni acceder a los derechos más elementales que se establecen en las distintas naciones y organismos internacionales. La inversión estatal no alcanza para atender la magnitud de la problemática, y se estima que se necesitaría un presupuesto de 6 trillones de dólares a nivel mundial para formalizar e integrar a todas las personas. En África y Latinoamérica es donde este problema se revela más evidente y donde representa un desafío clave para el desarrollo de las naciones. Este escenario nos indica que es necesario, por un lado, generar fuentes de financiamiento creativas e innovadoras que sumen al capital privado en pos de la integración socio urbana y la garantía de acceso a derechos básicos, y por otro, generar el uso más eficiente posible de los recursos públicos. En este trabajo me concentraré en la segunda cuestión mencionada, preguntándome si en los últimos años en Argentina, la distribución espacial de los fondos públicos fue utilizada de manera eficiente, y a que criterios respondió esta distribución. Por último, intentaré plantear algunas iniciativas para mejorar la eficiencia en el uso de los fondos del estado para la integración de los barrios populares.
+
+
+```{r}
+library(dplyr)
+```
+
+En Argentina existen 5.687 Barrios Populares, distribuidos en todo el territorio del país. Estos barrios precarios ocupan en total 590 km2, el equivalente a casi 3 veces la superficie de la Ciudad Autónoma de Buenos Aires, y están habitadas por 1,2 millón de familias, equivalentes a 5.280.000 personas.
+
+Es interesante ver como están distribuidos los barrios populares, y la cantidad de familias que albergan en las distintas provincias. 
+
+```{r}
+familias_provincia_BP <- lista_BP %>%
+  group_by(provincia) %>%
+  summarise(total_familias = sum(cantidad_familias_aproximada))
+head(familias_provincia_BP, 100)
+```
+Observamos que la Provincia de Buenos Aires reúne casi la mitad de las familias que habitan en Barrios Populares, concentrando en poca extensión de territorio, la mayor cantidad de personas en barrios informales.
+
+Veamos como se distribuye la extensión en m2 de los Barrios populares por provincia 
+
+```{r}
+superficie_familias_provincia_BP <-lista_BP %>%
+  group_by(provincia) %>%
+  summarise(total_familias = sum(cantidad_familias_aproximada), 
+           total_superficie = sum(superficie_m2))
+head(superficie_familias_provincia_BP,100)
+```
+
+```{r}
+library(ggplot2)
+```
+`
+```{r}
+library(sf)
+```
+```{r}
+BP_geo <- st_read("data/2022-07-13_info_publica.gpkg")
+```
+
+Tal vez en un gráfico se pueda observar mejor la relación entre superficie y cantidad de familias por provincia. 
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+ggplot(superficie_familias_provincia_BP) +
+  geom_bar(aes(x=reorder(provincia, total_familias), weight=total_familias))+
+  labs(title="Cantidad de familias en BP por provincia",
+       fill="Zona",
+       x="Provincia",
+       y="Cantidad de familias",
+       caption="Fuente: RE.NA.BAP.") +
+  theme_light()+
+  coord_flip()
+```
+
+```{r}
+py_fisu <- read.csv("data/proyectos_fisu-2022-07-27.csv", stringsAsFactors = TRUE)
+```
+
+```{r}
+dim(py_fisu)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+fisu_agrupados <- py_fisu %>%
+  group_by (provincia) %>%
+  summarise (monto_total_provincia=sum(monto_total))
+```
+
+```{r}
+ggplot(fisu_agrupados) +
+  geom_bar(aes(x=reorder(provincia, monto_total_provincia), weight=monto_total_provincia))+
+  labs(title="Inversión del FISU por provincia",
+       fill="",
+       x="Provincia",
+       y="Inversión",
+       caption="Fuente: Proyectos FISU") +
+  theme_light()+
+  coord_flip()
+```
+Vemos que la mayor parte de los recursos del FISU van dirigidos a financiar la urbanización de los Barrios Populares que se encuentran en la Provincia de Buenos Aires, donde consistentemente se concentran la mayor cantidad de familias habitantes de Barrios Populares.
+
+Cómo se distribuye la cantidad de familias habitantes de Barrios populares en la Provincia de Buenos Aires, por departamento
+
+```{r}
+BP_PBA <-
+  filter (lista_BP, provincia =="Buenos Aires")
+```
+
+```{r}
+familias_BP_PBA <- BP_PBA %>%
+  group_by(departamento) %>%
+  summarise(total_familias = sum(cantidad_familias_aproximada))
+```
+```{r}
+head(familias_BP_PBA,135)
+```
+Veamos los 20 distritos con más familias habitantes de barrios populares
+```{r}
+familias_BP_PBA <- filter(familias_BP_PBA,total_familias >= 9000 )
+```
+
+
+```{r}
+ggplot(familias_BP_PBA) +
+  geom_bar(aes(x=reorder(departamento, total_familias), weight=total_familias))+
+  labs(title="Distribución de familias en BP en PBA",
+       fill="",
+       x="Departamento",
+       y="Cantidad de familias",
+       caption="Fuente: RE.NA.BAP.") +
+  theme_light()+
+  coord_flip()
+```
+Ahora veamos como se distribuye la inversión del FISU en la Provincia de Buenos Aires
+
+```{r}
+departamentos_pba <- st_read('data/Partidos.geojson')
+```
+
+
+
+```{r}
+fisu_BP_familias_inversion <- merge(x = py_fisu, y = lista_BP, by = "renabap_id")
+```
+
+```{r}
+fisu_BP_familias_inversion <- filter(fisu_BP_familias_inversion, provincia.x == "Buenos Aires" )
+```
+
+```{r}
+fisu_BP_familias_inversion <- rename(fisu_BP_familias_inversion, nam=municipio) 
+```
+
+```{r}
+fisu_BP_familias_inversion <- select(fisu_BP_familias_inversion, nam, provincia.x, monto_total, cantidad_familias_aproximada)
+```
+```{r}
+inversion_fisu_pba <- left_join(departamentos_pba, fisu_BP_familias_inversion, by=c("nam"="nam"))
+```
+
+Veamos en un gráfico de barras la distribución de la inversión de los distritos que recibieron más de $300.000.000 
+
+```{r}
+inversion_fisu_pba_filtro <- filter(inversion_fisu_pba,monto_total >= 300000000)
+```
+
+```{r}
+ggplot(inversion_fisu_pba_filtro) +
+  geom_bar(aes(x=reorder(nam, monto_total), weight=monto_total))+
+  labs(title="Distribución de inversión en BP en PBA",
+       fill="",
+       x="Departamento",
+       y="Monto invertido", 
+       caption="Fuente: FISU y RE.NA.BAP.") +
+  theme_light()+
+  coord_flip()
+```
+
+
+```{r}
+ggplot()+
+  geom_sf(data=inversion_fisu_pba, aes(fill=monto_total), color=NA) +
+    labs(title = "Monto invertido desde FISU en BP",
+         subtitle = "Provincia de Buenos Aires",
+         fill = "Monto total",
+         caption= "Fuente: RE.NA.BAP y FISU") +
+  theme_light()
+```
+Ahora sería interesante analizar la inversión relacionada con la cantidad de familias, para entender como se distribuye en la PBA, la cantidad de dinero destinado por familia a partir del FISU.
+
+```{r}
+ggplot()+
+  geom_sf(data=inversion_fisu_pba, aes(fill=monto_total/cantidad_familias_aproximada), color=NA) +
+    labs(title = "Monto invertido desde FISU en BP",
+         subtitle = "Provincia de Buenos Aires",
+         fill = "Monto total",
+         caption= "Fuente: RE.NA.BAP y FISU") +
+  theme_light()
+```
+Aqui se ve claramente como se diferencia cuando se ve la inversión por familia y no la inversión total por departamento en proyectos de integración socio urbana. Pareciera que la inversión no está correctamente direccionada, en cuanto vemos que hay distritos que tienen una gran cantidad de inversión por familia cuando hay muchos otros, sobre todo en el AMBA que no la tienen.  
+```{r}
+inversion_fisu_pba_xfamilia <- mutate(inversion_fisu_pba, inversion_xfamilia = monto_total/cantidad_familias_aproximada)
+```
+Veamos los 25 departamentos de AMBA con más inversión del FISU por familia 
+```{r}
+inversion_fisu_pba_xfamilia_filtro <- filter(inversion_fisu_pba_xfamilia, inversion_xfamilia >=1100000)
+```
+
+```{r}
+ggplot(inversion_fisu_pba_xfamilia_filtro) +
+  geom_bar(aes(x=reorder(nam, inversion_xfamilia), weight=inversion_xfamilia))+
+  labs(title="Distribución de inversión por familia en BP en PBA",
+       fill="",
+       x="Departamento",
+       y="Monto invertido por familia", 
+       caption="Fuente: FISU y RE.NA.BAP.") +
+  theme_light()+
+  coord_flip()
+```
+Aqui se ve claramente que no se condice los distritos con más familias en Barrios populares con la inversión por familia del FISU en proyectos de integración socio urbana. 
+
+```{r}
+departamentos_rmba <- st_read('data/RMBA.geojson')
+```
+
+```{r}
+inversion_fisu_rmba<- left_join(departamentos_rmba, fisu_BP_familias_inversion, by=c("DEPTO"="nam"))
+```
+
+Hagamos zoom en la Región Metropolitana de Bs.As. para ver como se distribuye la inversión por familia habitante de BP en a partir del FISU en esta zona.
+
+
+```{r}
+ggplot()+
+  geom_sf(data=inversion_fisu_rmba, aes(fill=monto_total/cantidad_familias_aproximada), color=NA) +
+    labs(title = "Monto invertido desde FISU en BP",
+         subtitle = "RMBA",
+         fill = "Monto total",
+         caption= "Fuente: RE.NA.BAP y FISU") +
+  theme_light()
+```
+
+
+
+
+
